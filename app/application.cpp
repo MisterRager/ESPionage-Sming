@@ -37,36 +37,45 @@ void startTpmServer() {
   udp.listen(TPM2_CLIENT_PORT);
 }
 
-uint8_t *packet;
 uint8_t *payload;
 size_t packet_number = 0;
 size_t packet_count = 0;
 size_t payload_size = 0;
 uint8_t packet_type = 0;
 
-void onUdpReceive(UdpConnection& con, char *data, int size, IPAddress remoteIp, uint16_t remotePort) {
+const char *onTpm2Receive(UdpConnection& con, uint8_t *packet) {
   size_t new_len;
-  packet = (uint8_t *) data;
-	packet_type = tpm2_packet_type(packet);
+  packet_type = tpm2_packet_type(packet);
+
+  if (packet_type == PACKET_DATA ) {
+    packet_number = tpm2_packet_number(packet);
+    packet_count = (packet_number > packet_count) ? packet_number : packet_count;
+    payload_size = tpm2_packet_payload_size(packet);
+    payload = tpm2_packet_payload(packet);
+
+    if (packet_size == 0 || packet_number == 1) {
+      packet_size = payload_size;
+    }
+
+    new_len = (packet_count - 1)  * packet_size + payload_size;
+    len = (len < new_len) ? new_len : len;
+    memcpy(&buffer[(packet_number - 1) * packet_size], payload, packet_size);
+  }
+
+  return TPM2_CLIENT_RESPONSE;
+}
+
+void onUdpReceive(UdpConnection& con, char *data, int size, IPAddress remoteIp, uint16_t remotePort) {
+  const char *response;
+  uint8_t *packet = (uint8_t *) data;
 
   if (tpm2_packet_is_tpm2(packet)) {
-    if (packet_type == PACKET_DATA ) {
-      packet_number = tpm2_packet_number(packet);
-      packet_count = (packet_number > packet_count) ? packet_number : packet_count;
-      payload_size = tpm2_packet_payload_size(packet);
-      payload = tpm2_packet_payload(packet);
+    response = onTpm2Receive(con, packet);
+  } else {
+    response = "";
+  }
 
-      if (packet_size == 0 || packet_number == 1) {
-        packet_size = payload_size;
-      }
-
-      new_len = (packet_count - 1)  * packet_size + payload_size;
-      len = (len < new_len) ? new_len : len;
-      memcpy(&buffer[(packet_number - 1) * packet_size], payload, packet_size);
-    }
-	}
-  con.sendStringTo(remoteIp, TPM2_ACK_PORT, TPM2_CLIENT_RESPONSE);
-
+  con.sendStringTo(remoteIp, TPM2_ACK_PORT, response);
   paintBuffer();
 }
 
