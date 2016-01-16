@@ -3,6 +3,7 @@
 
 #include "apa102.cpp"
 #include "tpm2_net.c"
+#include "art_net.c"
 #include "application.hpp"
 
 #define MAX_LEN 2048
@@ -16,7 +17,14 @@ UdpConnection udp(onUdpReceive);
 uint8_t buffer[MAX_LEN * 3];
 size_t len = 0;
 size_t packet_size = 0;
-size_t highest_packet = 1;
+
+uint8_t *payload;
+size_t packet_number = 0;
+size_t packet_count = 0;
+size_t payload_size = 0;
+uint8_t packet_type = 0;
+
+Artnet_ReplyPacket artnet_reply;
 
 void init()
 {
@@ -30,20 +38,52 @@ void init()
   WifiStation.config(WIFI_SSID, WIFI_PWD);
   WifiAccessPoint.enable(false);
 
+  memcpy(&buffer[(packet_number - 1) * packet_size], payload, packet_size);
+  memset(&artnet_reply.port, 0, sizeof(Artnet_ReplyPacket));
+  artnet_reply.port = ARTNET_PORT_L;
+  artnet_reply.portH = ARTNET_PORT_H;
+  artnet_reply.verH = 0;
+  artnet_reply.ver = ARTNET_VERSION;
+  artnet_reply.subH = 0;
+  artnet_reply.sub = 0;
+  artnet_reply.oem = ARTNET_OEM_L;
+  artnet_reply.oemH = ARTNET_OEM_H;
+  artnet_reply.ubea = 0;
+  artnet_reply.status = 0;
+  strcpy((char *) artnet_reply.etsaman, ARTNET_ETSA_MAN);
+  strcpy((char *) artnet_reply.shortname, ARTNET_SHORT_NAME);
+  strcpy((char *) artnet_reply.longname, ARTNET_LONG_NAME);
+  artnet_reply.numbports = 1;
+  artnet_reply.numbportsH = 0;
+  artnet_reply.porttypes[0] = 0x80;
+  artnet_reply.swout[0] = 0;
+
   WifiStation.waitConnection(startTpmServer);
 }
 
 void startTpmServer() {
-  udp.listen(TPM2_CLIENT_PORT);
+  //udp.listen(TPM2_CLIENT_PORT);
+  udp.listen(ARTNET_PORT);
 }
 
-uint8_t *payload;
-size_t packet_number = 0;
-size_t packet_count = 0;
-size_t payload_size = 0;
-uint8_t packet_type = 0;
+void onUdpReceive(UdpConnection& con, char *data, int size, IPAddress remoteIp, uint16_t remotePort) {
+  const char *response = NULL;
+  uint8_t *packet = (uint8_t *) data;
 
-const char *onTpm2Receive(UdpConnection& con, uint8_t *packet) {
+  if (tpm2_packet_is_tpm2(packet)) {
+    response = onTpm2Receive(packet);
+  } else if (artnet_packet_is_artnet(packet)) {
+    response = onArtnetReceive(packet, &remoteIp);
+  }
+
+  if (response != NULL) {
+    con.sendStringTo(remoteIp, TPM2_ACK_PORT, response);
+  }
+
+  paintBuffer();
+}
+
+const char *onTpm2Receive(uint8_t *packet) {
   size_t new_len;
   packet_type = tpm2_packet_type(packet);
 
@@ -65,18 +105,29 @@ const char *onTpm2Receive(UdpConnection& con, uint8_t *packet) {
   return TPM2_CLIENT_RESPONSE;
 }
 
-void onUdpReceive(UdpConnection& con, char *data, int size, IPAddress remoteIp, uint16_t remotePort) {
-  const char *response;
-  uint8_t *packet = (uint8_t *) data;
+const char *onArtnetReceive(uint8_t *packet, IPAddress *remoteIp) {
+  Artnet_DmxHeader *header = (Artnet_DmxHeader *) packet;
+  size_t new_len;
+  size_t buffer_offset = (header->universe - 1) * 512;
 
-  if (tpm2_packet_is_tpm2(packet)) {
-    response = onTpm2Receive(con, packet);
-  } else {
-    response = "";
+  if (header->opCode == ARTNET_DMX) {
+    payload_size = artnet_packet_payload_size(header);
+    if (header->universe >= packet_count) {
+      packet_count = (uint8_t) (header->universe & 0xFF);
+    }
+    new_len = (packet_count - 1)  * packet_size + payload_size;
+    len = (len < new_len) ? new_len : len;
+    memcpy(
+      &buffer[buffer_offset],
+      artnet_packet_payload(packet),
+      payload_size
+    );
+  } else if (header->opCode == ARTNET_POLL) {
+    memcpy(artnet_reply.ip, (uint8_t **) remoteIp, 4);
+    strcpy((char *) artnet_reply.nodereport, "All peachy!");
+    return (char *) &artnet_reply;
   }
-
-  con.sendStringTo(remoteIp, TPM2_ACK_PORT, response);
-  paintBuffer();
+  return NULL;
 }
 
 void paintBuffer() {

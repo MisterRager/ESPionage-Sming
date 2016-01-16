@@ -8,8 +8,12 @@
 #define TPM2_CLIENT_PORT 0xFFE2
 #define TPM2_ACK_PORT 0xFFA2
 
+#ifndef MIN
 #define MIN(a,b) (((a)<(b))?(a):(b))
+#endif
+#ifndef MAX
 #define MAX(a,b) (((a)>(b))?(a):(b))
+#endif
 
 int tpm2_packet_is_tpm2(uint8_t *buffer);
 uint8_t tpm2_packet_type(uint8_t *buffer);
