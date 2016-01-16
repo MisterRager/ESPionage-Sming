@@ -5,6 +5,7 @@
 #include "tpm2_net.c"
 #include "art_net.c"
 #include "application.hpp"
+#include "http_server.cpp"
 
 #define MAX_LEN 2048
 
@@ -31,7 +32,7 @@ void init()
 {
   memset(buffer, 0, MAX_LEN * 3);
   Serial.begin(SERIAL_BAUD_RATE);
-  Serial.systemDebugOutput(false); // Allow debug print to serial
+  Serial.systemDebugOutput(true); // Allow debug print to serial
   SPI.begin();
 
   //UDP server
@@ -59,12 +60,14 @@ void init()
   artnet_reply.porttypes[0] = 0x80;
   artnet_reply.swout[0] = 0;
 
-  WifiStation.waitConnection(startTpmServer);
+  WifiStation.waitConnection(start_servers);
 }
 
-void startTpmServer() {
+void start_servers() {
   tpm2.listen(TPM2_CLIENT_PORT);
   artnet.listen(ARTNET_PORT);
+  http_server_init();
+  ajax_init();
 }
 
 void onUdpReceive(UdpConnection& con, char *data, int size, IPAddress remoteIp, uint16_t remotePort) {
@@ -144,4 +147,33 @@ void paintBuffer() {
   } else {
     Serial.printf("Skipping paint for mutex lock\n");
   }
+}
+
+const char *METHOD_GET = "GET";
+const char *METHOD_POST = "POST";
+
+void http_brightness (HttpRequest &request, HttpResponse &response) {
+  JsonObjectStream* stream = new JsonObjectStream();
+  JsonObject& response_obj = stream->getRoot();
+
+  Serial.println("Brightness http method");
+
+  String method = request.getRequestMethod();
+  const char * c_method = method.c_str();
+
+  if (memcmp(c_method, METHOD_POST, 5) == 0) {
+    response_obj["old_brightness"] = brightness;
+    brightness = request.getPostParameter("brightness").toInt();
+  }
+  response_obj["brightness"] = brightness;
+
+  Serial.println("Brightness http method processed");
+
+  response.sendJsonObject(stream);
+
+  Serial.println("Brightness http method done");
+}
+
+void ajax_init() {
+  http_add_route("brightness", http_brightness);
 }
