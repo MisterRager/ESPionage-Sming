@@ -13,7 +13,8 @@
 
 uint8_t mutex = MUTEX_UNLOCKED;
 uint8_t brightness = 0xFF;
-UdpConnection udp(onUdpReceive);
+UdpConnection tpm2(onUdpReceive);
+UdpConnection artnet(onUdpReceive);
 uint8_t buffer[MAX_LEN * 3];
 size_t len = 0;
 size_t packet_size = 0;
@@ -62,8 +63,8 @@ void init()
 }
 
 void startTpmServer() {
-  //udp.listen(TPM2_CLIENT_PORT);
-  udp.listen(ARTNET_PORT);
+  tpm2.listen(TPM2_CLIENT_PORT);
+  artnet.listen(ARTNET_PORT);
 }
 
 void onUdpReceive(UdpConnection& con, char *data, int size, IPAddress remoteIp, uint16_t remotePort) {
@@ -72,12 +73,13 @@ void onUdpReceive(UdpConnection& con, char *data, int size, IPAddress remoteIp, 
 
   if (tpm2_packet_is_tpm2(packet)) {
     response = onTpm2Receive(packet);
+    con.sendStringTo(remoteIp, TPM2_ACK_PORT, response);
   } else if (artnet_packet_is_artnet(packet)) {
     response = onArtnetReceive(packet, &remoteIp);
-  }
 
-  if (response != NULL) {
-    con.sendStringTo(remoteIp, TPM2_ACK_PORT, response);
+    if (response != NULL) {
+      con.sendStringTo(remoteIp, ARTNET_PORT, response);
+    }
   }
 
   paintBuffer();
