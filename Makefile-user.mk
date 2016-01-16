@@ -28,6 +28,6 @@ SMING_HOME = /opt/sming/Sming
 COM_PORT = /dev/ttyUSB0
 
 # Com port speed
-# COM_SPEED	= 250000
+COM_SPEED	= 250000
 #
 SPIFF_FILES=web
