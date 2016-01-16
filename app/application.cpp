@@ -31,7 +31,7 @@ void init()
 {
   memset(buffer, 0, MAX_LEN * 3);
   Serial.begin(SERIAL_BAUD_RATE);
-  Serial.systemDebugOutput(true); // Allow debug print to serial
+  Serial.systemDebugOutput(false); // Allow debug print to serial
   SPI.begin();
 
   //UDP server
@@ -70,16 +70,20 @@ void startTpmServer() {
 void onUdpReceive(UdpConnection& con, char *data, int size, IPAddress remoteIp, uint16_t remotePort) {
   const char *response = NULL;
   uint8_t *packet = (uint8_t *) data;
+  uint16_t port;
 
   if (tpm2_packet_is_tpm2(packet)) {
     response = onTpm2Receive(packet);
-    con.sendStringTo(remoteIp, TPM2_ACK_PORT, response);
+    port = TPM2_ACK_PORT;
   } else if (artnet_packet_is_artnet(packet)) {
     response = onArtnetReceive(packet, &remoteIp);
+    port = ARTNET_PORT;
+  }
 
-    if (response != NULL) {
-      con.sendStringTo(remoteIp, ARTNET_PORT, response);
-    }
+  if (response != NULL) {
+    con.sendStringTo(remoteIp, ARTNET_PORT, response);
+  } else {
+    con.sendStringTo(remoteIp, ARTNET_PORT, "");
   }
 
   paintBuffer();
