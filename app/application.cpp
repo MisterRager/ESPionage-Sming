@@ -32,7 +32,7 @@ void init()
 {
   memset(buffer, 0, MAX_LEN * 3);
   Serial.begin(SERIAL_BAUD_RATE);
-  Serial.systemDebugOutput(true); // Allow debug print to serial
+  Serial.systemDebugOutput(false); // Allow debug print to serial
   SPI.begin();
 
   //UDP server
@@ -156,8 +156,6 @@ void http_brightness (HttpRequest &request, HttpResponse &response) {
   JsonObjectStream* stream = new JsonObjectStream();
   JsonObject& response_obj = stream->getRoot();
 
-  Serial.println("Brightness http method");
-
   String method = request.getRequestMethod();
   const char * c_method = method.c_str();
 
@@ -167,11 +165,7 @@ void http_brightness (HttpRequest &request, HttpResponse &response) {
   }
   response_obj["brightness"] = brightness;
 
-  Serial.println("Brightness http method processed");
-
   response.sendJsonObject(stream);
-
-  Serial.println("Brightness http method done");
 }
 
 void ajax_init() {
