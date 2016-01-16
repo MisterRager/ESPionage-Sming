@@ -5,11 +5,22 @@
 #include "tpm2_net.c"
 #include "application.hpp"
 
+#define MAX_LEN 2048
+
+#define MUTEX_LOCKED 1
+#define MUTEX_UNLOCKED 0
+
+uint8_t mutex = MUTEX_UNLOCKED;
 uint8_t brightness = 0xFF;
 UdpConnection udp(onUdpReceive);
+uint8_t buffer[MAX_LEN * 3];
+size_t len = 0;
+size_t packet_size = 0;
+size_t highest_packet = 1;
 
 void init()
 {
+  memset(buffer, 0, MAX_LEN * 3);
   Serial.begin(SERIAL_BAUD_RATE);
   Serial.systemDebugOutput(true); // Allow debug print to serial
   SPI.begin();
@@ -26,18 +37,45 @@ void startTpmServer() {
   udp.listen(TPM2_CLIENT_PORT);
 }
 
+uint8_t *packet;
+uint8_t *payload;
+size_t packet_number = 0;
+size_t packet_count = 0;
+size_t payload_size = 0;
+uint8_t packet_type = 0;
+
 void onUdpReceive(UdpConnection& con, char *data, int size, IPAddress remoteIp, uint16_t remotePort) {
-  uint8_t *packet = (uint8_t *) data;
-  Serial.println("Got packet!");
+  size_t new_len;
+  packet = (uint8_t *) data;
+	packet_type = tpm2_packet_type(packet);
 
   if (tpm2_packet_is_tpm2(packet)) {
-    if (tpm2_packet_type(packet) == PACKET_DATA ) {
-      showColorBuffer(
-        tpm2_packet_payload(packet),
-        tpm2_packet_payload_size(packet),
-        brightness
-      );
+    if (packet_type == PACKET_DATA ) {
+      packet_number = tpm2_packet_number(packet);
+      packet_count = (packet_number > packet_count) ? packet_number : packet_count;
+      payload_size = tpm2_packet_payload_size(packet);
+      payload = tpm2_packet_payload(packet);
+
+      if (packet_size == 0 || packet_number == 1) {
+        packet_size = payload_size;
+      }
+
+      new_len = (packet_count - 1)  * packet_size + payload_size;
+      len = (len < new_len) ? new_len : len;
+      memcpy(&buffer[(packet_number - 1) * packet_size], payload, packet_size);
     }
-  }
+	}
   con.sendStringTo(remoteIp, TPM2_ACK_PORT, TPM2_CLIENT_RESPONSE);
+
+  paintBuffer();
+}
+
+void paintBuffer() {
+  if (mutex == MUTEX_UNLOCKED) {
+    mutex = MUTEX_LOCKED;
+    showColorBuffer(buffer, len * 3, brightness);
+    mutex = MUTEX_UNLOCKED;
+  } else {
+    Serial.printf("Skipping paint for mutex lock\n");
+  }
 }
