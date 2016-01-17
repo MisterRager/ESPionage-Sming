@@ -40,7 +40,8 @@ void read_wifi_credentials(WifiCredentials &config_credentials) {
       }
 
       config_credentials.ssid = config_string.substring(0, newline_pos);
-      config_credentials.password = config_string.substring(newline_pos + 1, second_newline_pos - newline_pos);
+      config_credentials.password = config_string.substring(newline_pos + 1, second_newline_pos - newline_pos - 1);
+
     }
   }
 }
