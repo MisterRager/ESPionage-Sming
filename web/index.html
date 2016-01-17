@@ -36,6 +36,22 @@
         );
         return false;
       });
+
+      var ssid_input = $("input#wifi_ssidfm");
+      var pass_input = $("input#wifi_passwordfm");
+
+      $("form#wififm").submit(function() {
+        $.post("/wifi_credentials",
+          {
+            wifi_ssid: ssid_input.val(),
+            wifi_password: pass_input.val()
+          },
+          function(res) {
+            console.log(res);
+          }
+        );
+        return false;
+      });
     });
     </script>
   </head>
@@ -43,10 +59,23 @@
     <form id="brightnessfm" action="/brightness">
       <ul>
         <li>
-          <label for="brightnes">Brightness </label>
+          <label for="brightnessfm">Brightness</label>
           <input type="range" id="brightness" name="brightness" min="0" max="31" step="1" value="31"/>
         </li>
       </ul>
+    </form>
+    <form id="wififm" action="/wifi_credentials">
+      <ul>
+        <li>
+          <label for="wifi_ssidfm">SSID</label>
+          <input type="text" id="wifi_ssidfm" name="wifi_ssid" />
+        </li>
+        <li>
+          <label for="wifi_passwordfm">Password</label>
+          <input type="password" id="wifi_passwordfm" name="wifi_password" />
+        </li>
+      </ul>
+      <button type="submit" id="wifi_submit">Update WiFi</button>
     </form>
   </body>
 </html>

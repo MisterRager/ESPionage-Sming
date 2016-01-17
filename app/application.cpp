@@ -55,9 +55,17 @@ void init()
     spiffs_mount_manual(RBOOT_SPIFFS_1 + 0x40200000, SPIFF_SIZE);
   }
 
+  read_wifi_credentials(wifi_credentials);
+
+  if (!wifi_credentials.ssid || !wifi_credentials.ssid.length()) {
+    wifi_credentials.ssid = WIFI_SSID;
+    wifi_credentials.password = WIFI_PWD;
+    save_wifi_credentials(wifi_credentials);
+  }
+
   //UDP server
   WifiStation.enable(true);
-  WifiStation.config(WIFI_SSID, WIFI_PWD);
+  WifiStation.config(wifi_credentials.ssid, wifi_credentials.password);
   WifiAccessPoint.enable(false);
 
   memcpy(&buffer[(packet_number - 1) * packet_size], payload, packet_size);
@@ -165,7 +173,7 @@ void paintBuffer() {
     showColorBuffer(buffer, len * 3, brightness);
     mutex = MUTEX_UNLOCKED;
   } else {
-    Serial.printf("Skipping paint for mutex lock\n");
+    Serial.println("Skipping paint for mutex lock");
   }
 }
 
