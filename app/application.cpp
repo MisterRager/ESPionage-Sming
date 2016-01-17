@@ -6,11 +6,19 @@
 #include "art_net.c"
 #include "application.hpp"
 #include "http_server.cpp"
+#include "config.cpp"
 
 #define MAX_LEN 2048
 
 #define MUTEX_LOCKED 1
 #define MUTEX_UNLOCKED 0
+
+#ifndef WIFI_SSID
+#define WIFI_SSID "ESPionage"
+#endif
+#ifndef WIFI_PWD
+#define WIFI_PWD ""
+#endif
 
 uint8_t mutex = MUTEX_UNLOCKED;
 uint8_t brightness = 0xFF;
@@ -28,12 +36,24 @@ uint8_t packet_type = 0;
 
 Artnet_ReplyPacket artnet_reply;
 
+WifiCredentials wifi_credentials;
+
 void init()
 {
   memset(buffer, 0, MAX_LEN * 3);
-  Serial.begin(SERIAL_BAUD_RATE);
+  Serial.begin(250000);
   Serial.systemDebugOutput(false); // Allow debug print to serial
   SPI.begin();
+
+  // SPIFFS filesystem
+  int slot = rboot_get_current_rom();
+  if (slot == 0) {
+    //debugf("trying to mount spiffs at %x, length %d", RBOOT_SPIFFS_0 + 0x40200000, SPIFF_SIZE);
+    spiffs_mount_manual(RBOOT_SPIFFS_0 + 0x40200000, SPIFF_SIZE);
+  } else {
+    //debugf("trying to mount spiffs at %x, length %d", RBOOT_SPIFFS_1 + 0x40200000, SPIFF_SIZE);
+    spiffs_mount_manual(RBOOT_SPIFFS_1 + 0x40200000, SPIFF_SIZE);
+  }
 
   //UDP server
   WifiStation.enable(true);
