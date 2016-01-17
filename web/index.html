@@ -52,6 +52,10 @@
         );
         return false;
       });
+
+      $.get("/wifi_credentials", null, function(res) {
+        ssid_input.val(res.ssid);
+      });
     });
     </script>
   </head>

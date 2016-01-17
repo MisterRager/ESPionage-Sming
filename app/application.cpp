@@ -1,5 +1,6 @@
 #include <user_config.h>
 #include <SmingCore/SmingCore.h>
+#include <WS2812/WS2812.h>
 
 #include "apa102.cpp"
 #include "tpm2_net.c"
@@ -13,17 +14,12 @@
 #define MUTEX_LOCKED 1
 #define MUTEX_UNLOCKED 0
 
-#ifndef WIFI_SSID
-#define WIFI_SSID "ESPionage"
-#endif
-#ifndef WIFI_PWD
-#define WIFI_PWD ""
-#endif
-
 uint8_t mutex = MUTEX_UNLOCKED;
+
 uint8_t brightness = 0xFF;
-UdpConnection tpm2(onUdpReceive);
-UdpConnection artnet(onUdpReceive);
+WifiCredentials wifi_credentials;
+LedType output_mode;
+
 uint8_t buffer[MAX_LEN * 3];
 size_t len = 0;
 size_t packet_size = 0;
@@ -36,7 +32,8 @@ uint8_t packet_type = 0;
 
 Artnet_ReplyPacket artnet_reply;
 
-WifiCredentials wifi_credentials;
+UdpConnection tpm2(onUdpReceive);
+UdpConnection artnet(onUdpReceive);
 
 void init()
 {
@@ -55,6 +52,7 @@ void init()
     spiffs_mount_manual(RBOOT_SPIFFS_1 + 0x40200000, SPIFF_SIZE);
   }
 
+  // Grab credentials from spiffs
   read_wifi_credentials(wifi_credentials);
 
   if (!wifi_credentials.ssid || !wifi_credentials.ssid.length()) {
@@ -63,10 +61,15 @@ void init()
     save_wifi_credentials(wifi_credentials);
   }
 
-  //UDP server
+  brightness = read_brightness();
+  output_mode = read_output_mode();
+
+  Serial.printf("Brightness %d, OutputMode %d\n", brightness, output_mode);
+
+  // Wifi init
+  WifiAccessPoint.enable(false);
   WifiStation.enable(true);
   WifiStation.config(wifi_credentials.ssid, wifi_credentials.password);
-  WifiAccessPoint.enable(false);
 
   memcpy(&buffer[(packet_number - 1) * packet_size], payload, packet_size);
   memset(&artnet_reply.port, 0, sizeof(Artnet_ReplyPacket));
@@ -88,10 +91,31 @@ void init()
   artnet_reply.porttypes[0] = 0x80;
   artnet_reply.swout[0] = 0;
 
-  WifiStation.waitConnection(start_servers);
+  // network daemons
+  WifiStation.waitConnection(start_servers, 30, wifi_failed);
+}
+
+void retry_wifi_client () {
+  WifiAccessPoint.enable(false);
+  WifiStation.enable(true);
+  WifiStation.config(wifi_credentials.ssid, wifi_credentials.password);
+  WifiStation.waitConnection(start_servers, 30, wifi_failed);
+}
+
+int servers_have_init = 0;
+
+void wifi_failed() {
+  WifiStation.enable(false);
+  WifiAccessPoint.enable(true);
+  start_servers();
 }
 
 void start_servers() {
+  if (servers_have_init) {
+    return;
+  }
+  servers_have_init = 1;
+
   tpm2.listen(TPM2_CLIENT_PORT);
   artnet.listen(ARTNET_PORT);
   http_server_init();
@@ -170,7 +194,16 @@ const char *onArtnetReceive(uint8_t *packet, IPAddress *remoteIp) {
 void paintBuffer() {
   if (mutex == MUTEX_UNLOCKED) {
     mutex = MUTEX_LOCKED;
-    showColorBuffer(buffer, len * 3, brightness);
+
+    switch (output_mode) {
+    case apa102:
+      showColorBuffer(buffer, len * 3, brightness);
+      break;
+    case ws281x:
+      ws2812_writergb(13, (char *) buffer, len * 3);
+      break;
+    }
+
     mutex = MUTEX_UNLOCKED;
   } else {
     Serial.println("Skipping paint for mutex lock");
@@ -190,12 +223,31 @@ void http_brightness (HttpRequest &request, HttpResponse &response) {
   if (memcmp(c_method, METHOD_POST, 5) == 0) {
     response_obj["old_brightness"] = brightness;
     brightness = request.getPostParameter("brightness").toInt();
+    save_brightness(brightness);
   }
   response_obj["brightness"] = brightness;
 
   response.sendJsonObject(stream);
 }
 
+void http_wifi_auth (HttpRequest &request, HttpResponse &response) {
+  JsonObjectStream* stream = new JsonObjectStream();
+  JsonObject& response_obj = stream->getRoot();
+
+  String method = request.getRequestMethod();
+  const char * c_method = method.c_str();
+
+  if (memcmp(c_method, METHOD_POST, 5) == 0) {
+    response_obj["old_ssid"] = wifi_credentials.ssid;
+    wifi_credentials.ssid = request.getPostParameter("wifi_ssid");
+    wifi_credentials.password = request.getPostParameter("wifi_password");
+  }
+  response_obj["ssid"] = wifi_credentials.ssid;
+
+  response.sendJsonObject(stream);
+}
+
 void ajax_init() {
   http_add_route("brightness", http_brightness);
+  http_add_route("wifi_credentials", http_wifi_auth);
 }

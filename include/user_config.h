@@ -40,6 +40,14 @@ extern "C" {
 	// Beta boards
 	#define BOARD_ESP01
 
+#ifndef WIFI_SSID
+#define WIFI_SSID "ESPionage"
+#endif
+
+#ifndef WIFI_PWD
+#define WIFI_PWD ""
+#endif
+
 #ifdef __cplusplus
 }
 #endif
