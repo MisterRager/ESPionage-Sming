@@ -24,7 +24,15 @@ void onIndex(HttpRequest &request, HttpResponse &response) {
 }
 
 void http_server_init() {
-  spiffs_mount(); // Mount file system, in order to work with files
+  int slot = rboot_get_current_rom();
+  if (slot == 0) {
+    //debugf("trying to mount spiffs at %x, length %d", RBOOT_SPIFFS_0 + 0x40200000, SPIFF_SIZE);
+    spiffs_mount_manual(RBOOT_SPIFFS_0 + 0x40200000, SPIFF_SIZE);
+  } else {
+    //debugf("trying to mount spiffs at %x, length %d", RBOOT_SPIFFS_1 + 0x40200000, SPIFF_SIZE);
+    spiffs_mount_manual(RBOOT_SPIFFS_1 + 0x40200000, SPIFF_SIZE);
+  }
+
   server.listen(80);
   http_add_route("/", onIndex);
   server.setDefaultHandler(onFile);
