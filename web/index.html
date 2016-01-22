@@ -55,11 +55,22 @@
       $.get("/wifi_credentials", null, function(res) {
         ssid_input.val(res.ssid);
       });
+
+      var radios = $("input.led_type_radio");
+      $.get("/led_type", null, function(res) {
+        radios.filter("[value!=" + res.type +"]").prop("checked", false);
+        radios.filter("[value=" + res.type +"]").prop("checked", true);
+
+        radios.on("change", function() {
+          $.post("/led_type", {type: Number.parseInt($("input.led_type_radio:checked").val())});
+        });
+      });
     });
     </script>
   </head>
   <body>
     <form id="brightnessfm" action="/brightness">
+      <h3>APA102 "global" brightness (warning: low frequency pwm)</h3>
       <ul>
         <li>
           <label for="brightnessfm">Brightness</label>
@@ -68,6 +79,7 @@
       </ul>
     </form>
     <form id="wififm" action="/wifi_credentials">
+      <h3>Wifi Credentials</h3>
       <ul>
         <li>
           <label for="wifi_ssidfm">SSID</label>
@@ -79,6 +91,27 @@
         </li>
       </ul>
       <button type="submit" id="wifi_submit">Update WiFi</button>
+    </form>
+    <form id="typefm" action="led_type">
+      <h3>LED Strip Type:</h3>
+      <ul>
+        <li>
+          <label for="apa102_radio">APA102</label>
+          <input type="radio" value=0 name="type" class="led_type_radio"/>
+        </li>
+        <li>
+          <label for="ws2811_radio">WS2811</label>
+          <input type="radio" value=1 name="type" class="led_type_radio"/>
+        </li>
+        <li>
+          <label for="ws2812_radio">WS2812</label>
+          <input type="radio" value=2 name="type" class="led_type_radio"/>
+        </li>
+        <li>
+          <label for="apa104_radio">APA104</label>
+          <input type="radio" value=3 name="type" class="led_type_radio"/>
+        </li>
+      </ul>
     </form>
   </body>
 </html>

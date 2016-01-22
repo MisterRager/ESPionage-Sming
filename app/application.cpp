@@ -294,16 +294,23 @@ void http_output_led_type (HttpRequest &request, HttpResponse &response) {
   JsonObject& response_obj = stream->getRoot();
   String method = request.getRequestMethod();
   String param_input;
+  int param_input_int;
 
-  if (method.equals("METHOD_POST")) {
-    param_input = request.getPostParameter("output_type");
+  if (memcmp(method.c_str(), METHOD_POST, 5) == 0) {
+    param_input = request.getPostParameter("type");
+    param_input_int = param_input.toInt();
 
-    if (param_input.equals("apa102")) {
-      output_mode = apa102;
+    switch (param_input_int) {
+    case apa102:
+    case ws2811:
+    case ws2812:
+    case apa104:
+      response_obj["old_type"] = output_mode;
+      output_mode = (LedType) param_input_int;
       save_output_mode(output_mode);
-    } else if (param_input.equals("apa104")) {
-      output_mode = apa104;
-      save_output_mode(output_mode);
+      break;
+    default:
+      response_obj["error"] = "Unknown type";
     }
   }
 
