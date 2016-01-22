@@ -1,6 +1,8 @@
 enum LedType_enum {
   apa102,
-  ws281x
+  ws2811,
+  ws2812,
+  apa104
 };
 
 typedef LedType_enum LedType;
@@ -11,6 +13,8 @@ const char *onArtnetReceive(uint8_t *packet, IPAddress *remoteIp);
 void start_servers();
 void wifi_failed();
 void init();
+void init_leds();
 void ajax_init();
 void paintBuffer();
 void http_brightness (HttpRequest &request, HttpResponse &response);
+void updateOutputBuffer(uint8_t *input, uint16_t strip_len, uint16_t leds_offset);

@@ -28,11 +28,13 @@ SMING_HOME = /opt/sming/Sming
 COM_PORT = /dev/ttyUSB0
 
 # Com port speed
-COM_SPEED = 250000
+COM_SPEED = 500000
 
 SPIFF_FILES = web
 
-RBOOT_ENABLED = 1
-RBOOT_BIG_FLASH = 1
-RBOOT_TWO_ROMS  = 1
+# rBoot - bootloader-specific settings
+RBOOT_ENABLED   = 0
+#RBOOT_BIG_FLASH = 1
+#RBOOT_TWO_ROMS  = 1
 SPI_SIZE        = 4M
+SPI_MODE        = qio

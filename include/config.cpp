@@ -17,7 +17,7 @@ uint8_t read_brightness();
 
 void save_wifi_credentials(WifiCredentials &config_credentials) {
   String config_string = config_credentials.ssid + "\n" + config_credentials.password;
-  Serial.printf("Save!\n%s\n", config_string.c_str());
+  debugf("Save!\n%s\n", config_string.c_str());
   fileSetContent((const String) WIFI_CONFIG_FILE, config_string);
 }
 

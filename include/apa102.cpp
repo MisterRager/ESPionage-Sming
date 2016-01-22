@@ -3,7 +3,7 @@
 
 void showColor(size_t len, uint8_t brightness, uint8_t b, uint8_t g, uint8_t r)
 {
-  Serial.println("Go!");
+  debugf("Go!\n");
   char message[32] = "";
   int k, l;
   int count = 0;
@@ -25,7 +25,7 @@ void showColor(size_t len, uint8_t brightness, uint8_t b, uint8_t g, uint8_t r)
   }
 
   sprintf(message, "%d lights sent", count);
-  Serial.println(message);
+  debugf("%s\n", message);
 }
 
 void showColorBuffer(uint8_t *buffer, size_t len, uint8_t brightness) {
@@ -50,4 +50,44 @@ void showColorBuffer(uint8_t *buffer, size_t len, uint8_t brightness) {
   for (k = 0; k < l; k++) {
     SPI.transfer(1);
   }
+}
+
+APA102::APA102() {
+  brightness = APA102_MAX_BRIGHTNESS;
+}
+
+APA102::~APA102() {
+}
+
+void APA102::show(uint8_t *buffer) {
+  uint16_t k;
+  uint8_t l;
+
+  //Preamble
+  for (k = 0; k < 4; k++) {
+    SPI.transfer(0);
+  }
+
+  // Output data
+  for (k = 0; k < length * 3; k += 3) {
+    SPI.transfer(APA102_WORD_HEADER | brightness);
+    //SPI.transfer(&buffer[k], 3);
+    SPI.transfer(buffer[k]);
+    SPI.transfer(buffer[k + 1]);
+    SPI.transfer(buffer[k + 2]);
+  }
+
+  // Number of bytes to push the data all out of shift registers
+  l = (length + 14) / 16;
+  for (k = 0; k < l; k++) {
+    SPI.transfer(1);
+  }
+}
+
+void APA102::init(uint16_t len) {
+  length = len;
+}
+
+uint16_t APA102::numLeds() {
+  return length;
 }

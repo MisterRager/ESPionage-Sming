@@ -8,7 +8,7 @@ extern "C" {
 #endif
 
 	// UART config
-	#define SERIAL_BAUD_RATE 250000
+	#define SERIAL_BAUD_RATE 500000
 
 	// ESP SDK config
 	#define LWIP_OPEN_SRC

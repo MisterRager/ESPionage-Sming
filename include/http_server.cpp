@@ -28,9 +28,9 @@ void http_server_init() {
   http_add_route("/", onIndex);
   server.setDefaultHandler(onFile);
 
-  Serial.println("\r\n=== WEB SERVER STARTED ===");
-  Serial.println(WifiStation.getIP());
-  Serial.println("==============================\r\n");
+  debugf("\n=== WEB SERVER STARTED ===\n");
+  debugf("%s\n", WifiStation.getIP().toString().c_str());
+  debugf("==============================\n\n");
 }
 
 void http_add_route(const char * route_name, void (*f)(HttpRequest &request, HttpResponse &response)) {
