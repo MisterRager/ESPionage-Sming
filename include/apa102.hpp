@@ -1,8 +1,5 @@
-void showColor(size_t len, uint8_t brightness, uint8_t b, uint8_t g, uint8_t r);
-void showColorBuffer(uint8_t *buffer, size_t len, uint8_t brightness);
-
-#define APA102_WORD_HEADER 0xE0
-#define APA102_MAX_BRIGHTNESS 31
+#define APA102_WORD_HEADER 0b11100000
+#define APA102_MAX_BRIGHTNESS 0b11111
 
 class APA102 {
 public:

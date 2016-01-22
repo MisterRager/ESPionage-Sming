@@ -22,7 +22,6 @@
 
 uint8_t mutex = MUTEX_UNLOCKED;
 
-uint8_t brightness = 0xFF;
 WifiCredentials wifi_credentials;
 LedType output_mode;
 
@@ -52,7 +51,7 @@ Timer testTimer;
 void init()
 {
   Serial.begin(500000);
-  Serial.systemDebugOutput(true); // Allow debug print to serial
+  Serial.systemDebugOutput(false); // Allow debug print to serial
 
   // More dakka
   system_update_cpu_freq(160);
@@ -83,12 +82,12 @@ void init()
     save_wifi_credentials(wifi_credentials);
   }
 
-  brightness = read_brightness();
+  apa102_writer.brightness = read_brightness();
   output_mode = read_output_mode();
 
   init_leds();
 
-  debugf("Brightness %d, OutputMode %d\n", brightness, output_mode);
+  debugf("Brightness %d, OutputMode %d\n", apa102_writer.brightness, output_mode);
 
   // Wifi init
   WifiAccessPoint.enable(false);
@@ -235,7 +234,6 @@ void paintBuffer() {
 
     switch (output_mode) {
     case apa102:
-      //showColorBuffer(buffer, len * 3, brightness);
       if(apa102_writer.numLeds() != len) apa102_writer.init(len);
       apa102_writer.show(buffer);
       break;
@@ -264,11 +262,11 @@ void http_brightness (HttpRequest &request, HttpResponse &response) {
   const char * c_method = method.c_str();
 
   if (memcmp(c_method, METHOD_POST, 5) == 0) {
-    response_obj["old_brightness"] = brightness;
-    brightness = request.getPostParameter("brightness").toInt();
-    save_brightness(brightness);
+    response_obj["old_brightness"] = apa102_writer.brightness;
+    apa102_writer.brightness = request.getPostParameter("brightness").toInt();
+    save_brightness(apa102_writer.brightness);
   }
-  response_obj["brightness"] = brightness;
+  response_obj["brightness"] = apa102_writer.brightness;
 
   response.sendJsonObject(stream);
 }

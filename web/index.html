@@ -13,15 +13,14 @@
     <script language="javascript">
     $(function() {
       var max_bright = 31;
-      var bright_offset = 255 - 31;
 
       var bright_input = $("input#brightness");
       $.get("/brightness", null, function(res) {
-        bright_input.val((res.brightness - bright_offset) + "");
+        bright_input.val(res.brightness + "");
       });
       bright_input.change(function(){
         var new_val = Math.min(
-          Math.max(Number.parseInt(bright_input.val()) + bright_offset, 0),
+          Math.max(Number.parseInt(bright_input.val()), 0),
           255
         );
 
@@ -30,7 +29,7 @@
         $.post("/brightness",
           {brightness: new_val},
           function(res) {
-            bright_input.val((res.brightness - bright_offset) + "");
+            bright_input.val((res.brightness) + "");
             console.log(res);
           }
         );
