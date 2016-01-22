@@ -1,19 +1,20 @@
 # ESPionage-Sming
 ESP8266 application for controlling APA102 (dotstar) lights
 
-This uses the esp8266 as a bridge for lighting control data sent over the Art-Net or tpm2.net protocols. Configure the wifi settings, flash the controllers, and simply push unicast data at them with your favorite lighting desk software.
+This uses the esp8266 as a bridge for lighting control data sent over the [Art-Net](https://en.wikipedia.org/wiki/Art-Net) or [TPM2.net](https://gist.github.com/jblang/89e24e2655be6c463c56) protocols. Configure the wifi settings, flash the controllers, and simply push unicast data at them with your favorite lighting desk software.
 
 Build requirements:
-- Fairly recent Sming (and all its dependencies) at $SMING_HOME
-- esp_open_sdk at $ESP_HOME
-- SPI speed turned down to 0.5mbit or so:
+- Sming with SPI clocks exposed [Sming](https://github.com/MisterRager/Sming) at $SMING_HOME. This is a fork I made to do this.
+- [esp_open_sdk](https://github.com/pfalcon/esp-open-sdk) at $ESP_HOME
 - a config file at `include/user_config_local.h` with wifi credentials
 
-To actually install:
+To actually install onto the hardware:
 ```
 make
 make flash
 ```
+
+Note that you may need to configure `Makefile-user.mk`
 
 
 To set wifi credentialls, add the wifi credentials to `include/user_config_local.h`:
@@ -30,5 +31,10 @@ extern "C" {
 #endif
 ```
 
+The firmware boots up and connects to the configured WiFi network. On failure, it starts an unsecured network. Once wifi settings are figured out, it starts UDP servers listening for Art-Net and TPM2.net packet data and an http server for adjusting a few of the onboard settings.
 
-The SPI clock frequency is in `$SMING_HOME/Sming/SmingCore/SPI.cpp`. See method `SPIClass::begin`. The variables `predivider` and `divider` must be adjusted so that their product is `16`. I used `4` and `4` for the new values. Setting the divider too small runs the lights faster than the strip can actually stably drive the lights at the end.
+The http server is a combination of files in the `web` folder and some control endpoints called from the javascript. There, you can set a whole-strip global `brightness` value with a slider as well as the wifi credentials. The brightness should update as soon as you stop dragging the slider. The wifi settings *should* take hold after submitted. Else, just reboot the esp8266 module, and the new settings will be read on boot.
+
+The firmware is ready to receive lighting data from software like [Glediator](http://www.solderlab.de/index.php/software/glediator), [Pixelcontroller](http://pixelinvaders.ch/?page_id=160), or [https://github.com/heronarts/LX](LX) as well as professional stuff that I can't afford to test. The lighting data given in the packets is forwarded with the global brightness interpolated in since the global brightness isn't part of the data in formats I've encountered.
+
+Currently, the TPM2.net data is just forwarded as-is since there is no concept of "universes". Art-Net data is mangled a bit - the controller assumes unicast communication and puts the first 512 "lights" (red, green, and blue lights in each LED module) on the first universe, the next 512 on the second universe, etc. Eventually, this layout should be editable in the web interface. 
