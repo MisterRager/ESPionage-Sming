@@ -2,16 +2,11 @@
 #include <SmingCore/SmingCore.h>
 
 #include "apa102.cpp"
-//#include "nzt_out.cpp"
 #include "tpm2_net.c"
 #include "art_net.c"
 #include "application.hpp"
 #include "http_server.cpp"
 #include "config.cpp"
-//#include <WS2812/WS2812.h>
-//#include "ws2812_i2s/src/ws2812_i2s.cpp"
-//#include "ws2812i2s/ws2812_i2s.c"
-//#include <Adafruit_NeoPixel/Adafruit_NeoPixel.h>
 #include "ws2812_i2s/ws2812_i2s.cpp"
 
 
@@ -20,38 +15,36 @@
 #define MUTEX_LOCKED 1
 #define MUTEX_UNLOCKED 0
 
-uint8_t mutex = MUTEX_UNLOCKED;
+static uint8_t mutex = MUTEX_UNLOCKED;
+static uint8_t do_flush = 0;
 
-WifiCredentials wifi_credentials;
-LedType output_mode;
+static WifiCredentials wifi_credentials;
+static LedType output_mode;
 
-uint8_t buffer[MAX_LEN * 3];
-size_t len = 0;
-size_t packet_size = 0;
+static uint8_t buffer[MAX_LEN * 3];
+static size_t len = 0;
+static size_t packet_size = 0;
 
-uint8_t *payload;
-size_t packet_number = 0;
-size_t packet_count = 0;
-size_t payload_size = 0;
-uint8_t packet_type = 0;
+static uint8_t *payload;
+static size_t packet_number = 0;
+static size_t packet_count = 0;
+static size_t payload_size = 0;
+static uint8_t packet_type = 0;
 
-Artnet_ReplyPacket artnet_reply;
+static Artnet_ReplyPacket artnet_reply;
 
-UdpConnection tpm2(onUdpReceive);
-UdpConnection artnet(onUdpReceive);
+static UdpConnection tpm2(onUdpReceive);
+static UdpConnection artnet(onUdpReceive);
 
-//Apa104Writer apa104_writer(15);
-//WS2812 *ws2812_writer = NULL;
-WS2812 ws2812_writer;
-APA102 apa102_writer;
+static WS2812 ws2812_writer;
+static APA102 apa102_writer;
 
-Timer testTimer;
-//Adafruit_NeoPixel *neopixel_writer = NULL;
+static Timer testTimer;
 
 void init()
 {
   Serial.begin(500000);
-  Serial.systemDebugOutput(false); // Allow debug print to serial
+  Serial.systemDebugOutput(true); // Allow debug print to serial
 
   // More dakka
   system_update_cpu_freq(160);
@@ -62,10 +55,8 @@ void init()
 #ifdef RBOOT_SPIFFS_0
   int slot = rboot_get_current_rom();
   if (slot == 0) {
-    //debugf("trying to mount spiffs at %x, length %d", RBOOT_SPIFFS_0 + 0x40200000, SPIFF_SIZE);
     spiffs_mount_manual(RBOOT_SPIFFS_0 + 0x40200000, SPIFF_SIZE);
   } else {
-    //debugf("trying to mount spiffs at %x, length %d", RBOOT_SPIFFS_1 + 0x40200000, SPIFF_SIZE);
     spiffs_mount_manual(RBOOT_SPIFFS_1 + 0x40200000, SPIFF_SIZE);
   }
 #else
@@ -195,9 +186,10 @@ const char *onTpm2Receive(uint8_t *packet) {
       packet_size = payload_size;
     }
 
-    new_len = (packet_count - 1)  * packet_size + payload_size;
+    new_len = ((packet_count - 1)  * packet_size + payload_size) / 3;
     len = (len < new_len) ? new_len : len;
     memcpy(&buffer[(packet_number - 1) * packet_size], payload, packet_size);
+    do_flush = 1;
   }
 
   return TPM2_CLIENT_RESPONSE;
@@ -205,8 +197,13 @@ const char *onTpm2Receive(uint8_t *packet) {
 
 const char *onArtnetReceive(uint8_t *packet, IPAddress *remoteIp) {
   Artnet_DmxHeader *header = (Artnet_DmxHeader *) packet;
-  size_t new_len;
-  size_t buffer_offset = (header->universe - 1) * 512;
+  uint16_t new_len;
+  uint32_t  buffer_offset = 0;//(header->universe - 1) * 512;
+  debugf(
+    "Artnet packet: Seq(%d) Phy(%d) Uni(%d) BO(%u)\n",
+    header->sequence, header->physical, header->universe,
+    buffer_offset
+  );
 
   if (header->opCode == ARTNET_DMX) {
     payload_size = artnet_packet_payload_size(header);
@@ -214,12 +211,14 @@ const char *onArtnetReceive(uint8_t *packet, IPAddress *remoteIp) {
       packet_count = (uint8_t) (header->universe & 0xFF);
     }
     new_len = ((packet_count - 1)  * packet_size + payload_size) / 3;
+    debugf("Len is %u, but new len is %u\n", len, new_len);
     len = (len < new_len) ? new_len : len;
     memcpy(
       &buffer[buffer_offset],
       artnet_packet_payload(packet),
       payload_size
     );
+    do_flush = 1;
   } else if (header->opCode == ARTNET_POLL) {
     memcpy(artnet_reply.ip, (uint8_t **) remoteIp, 4);
     strcpy((char *) artnet_reply.nodereport, "All peachy!");
@@ -229,7 +228,8 @@ const char *onArtnetReceive(uint8_t *packet, IPAddress *remoteIp) {
 }
 
 void paintBuffer() {
-  if (mutex == MUTEX_UNLOCKED) {
+  if (do_flush && mutex == MUTEX_UNLOCKED) {
+    do_flush = 0;
     mutex = MUTEX_LOCKED;
 
     switch (output_mode) {
@@ -251,8 +251,8 @@ void paintBuffer() {
   }
 }
 
-const char *METHOD_GET = "GET";
-const char *METHOD_POST = "POST";
+static const char *METHOD_GET = "GET";
+static const char *METHOD_POST = "POST";
 
 void http_brightness (HttpRequest &request, HttpResponse &response) {
   JsonObjectStream* stream = new JsonObjectStream();
