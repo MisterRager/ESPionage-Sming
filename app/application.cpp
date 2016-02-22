@@ -43,7 +43,7 @@ static Timer testTimer;
 
 void init()
 {
-  Serial.begin(500000);
+  Serial.begin(115200);
   Serial.systemDebugOutput(true); // Allow debug print to serial
 
   // More dakka
@@ -150,6 +150,10 @@ void start_servers() {
   artnet.listen(ARTNET_PORT);
   http_server_init();
   ajax_init();
+
+  char ip_buffer[32];
+  WifiStation.getIP().toString().toCharArray(ip_buffer, 32);
+  debugf("IP Address is %s", ip_buffer);
 }
 
 void onUdpReceive(UdpConnection& con, char *data, int size, IPAddress remoteIp, uint16_t remotePort) {
@@ -198,19 +202,21 @@ const char *onTpm2Receive(uint8_t *packet) {
 const char *onArtnetReceive(uint8_t *packet, IPAddress *remoteIp) {
   Artnet_DmxHeader *header = (Artnet_DmxHeader *) packet;
   uint16_t new_len;
-  uint32_t  buffer_offset = 0;//(header->universe - 1) * 512;
+  uint16_t universe = artnet_packet_universe(header);
+  uint32_t  buffer_offset = (universe - 1) * 510;
   debugf(
-    "Artnet packet: Seq(%d) Phy(%d) Uni(%d) BO(%u)\n",
-    header->sequence, header->physical, header->universe,
-    buffer_offset
+    "Artnet packet: Seq(%u) Phy(%u) Uni(%u, %u | %u } %d) BO(%u)\n",
+    header->sequence, header->physical, header->universeHi, header->universe, universe,
+    universe, buffer_offset
   );
 
   if (header->opCode == ARTNET_DMX) {
     payload_size = artnet_packet_payload_size(header);
-    if (header->universe >= packet_count) {
-      packet_count = (uint8_t) (header->universe & 0xFF);
+    debugf("Payload size is %d", payload_size);
+    if (universe > packet_count){
+      packet_count = universe;
     }
-    new_len = ((packet_count - 1)  * packet_size + payload_size) / 3;
+    new_len = (170 * (universe - 1)) + (payload_size / 3);
     debugf("Len is %u, but new len is %u\n", len, new_len);
     len = (len < new_len) ? new_len : len;
     memcpy(
@@ -246,7 +252,7 @@ void paintBuffer() {
     }
 
     mutex = MUTEX_UNLOCKED;
-  } else {
+  } else if(mutex == MUTEX_LOCKED) {
     debugf("Skipping buffer paint for mutex lock\n");
   }
 }
