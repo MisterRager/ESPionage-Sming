@@ -111,7 +111,8 @@ struct Artnet_DmxHeader_Struct {
   uint8_t  ver;
   uint8_t  sequence;
   uint8_t  physical;
-  uint16_t  universe;
+  uint8_t universe;
+  uint8_t universeHi;
   uint8_t  lengthHi;
   uint8_t  length;
 } PACKED;
@@ -122,4 +123,5 @@ int artnet_packet_is_artnet(uint8_t *buffer);
 int artnet_packet_is_artnet(Artnet_DmxHeader *buffer);
 uint8_t *artnet_packet_payload(uint8_t *buffer);
 size_t artnet_packet_payload_size(uint8_t *buffer);
+uint16_t artnet_packet_universe(Artnet_DmxHeader *buffer);
 size_t artnet_packet_payload_size(Artnet_DmxHeader *buffer);

@@ -18,6 +18,10 @@ size_t artnet_packet_payload_size(Artnet_DmxHeader *buffer) {
   return (buffer->lengthHi << 8) + buffer->length;
 }
 
+uint16_t artnet_packet_universe(Artnet_DmxHeader *buffer){
+  return (buffer->universeHi << 8) + buffer->universe;
+}
+
 uint8_t *artnet_packet_payload(uint8_t *buffer) {
   return &buffer[18];
 }
